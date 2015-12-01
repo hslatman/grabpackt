@@ -1,0 +1,15 @@
+# Sample configuration file for PacktGrab
+[packt]
+user = johndoe@example.com
+pass = password
+
+[smtp]
+host = smtp@example.com
+port = 587
+user = janedoe@example.com
+pass = password
+
+[mail]
+to = johndoe@example.com
+
+
