@@ -1,6 +1,6 @@
 #######################################################################
 # 
-#   packtgrab.py
+#   grabpackt.py
 #
 #   Grab a free Packt Publishing book every day!
 #
@@ -153,9 +153,9 @@ def main():
  
                     msg['From'] = fromaddr
                     msg['To'] = toaddr
-                    msg['Subject'] = "PacktGrab: " + book_name
+                    msg['Subject'] = "GrabPackt: " + book_name
  
-                    body = "A new book was claimed by PacktGrab, called " + book_name
+                    body = "A new book was claimed by GrabPackt, called " + book_name
                     msg.attach(MIMEText(body, 'plain'))
  
                     #filename = "NAME OF THE FILE WITH ITS EXTENSION"
