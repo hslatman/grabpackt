@@ -1,15 +1,27 @@
 # Sample configuration file for PacktGrab
+
+# Packt Publishing credentials
 [packt]
 user = johndoe@example.com
 pass = password
 
+# SMTP Credentials
 [smtp]
 host = smtp@example.com
 port = 587
 user = janedoe@example.com
 pass = password
 
+# Settings for the mail that is received
 [mail]
-to = johndoe@example.com
+to = johndoe@example.com    # Address to send mail to.
+types = pemc                # Which file types: (p)df, (e)pub, (m)obi and/or (c)ode.
+links_only = 0              # Set to true to not receive attachments, only links.
+zip = 0                     # When true, selected file types are packaged in zip.
+force_zip = 0               # When true, a zip is created for a single file also.
+max_size = 10               # The maximum file size of (combined) attachment(s) in MB.
+delete = 1                  # When true, delete the files and/or zip when done.
+
+
 
 
