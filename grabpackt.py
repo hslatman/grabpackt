@@ -14,6 +14,7 @@ import argparse
 import os
 import sys
 import smtplib
+import zipfile
 
 from lxml import etree
 
@@ -216,12 +217,14 @@ def perform_download(session, book_id, links):
     
         files[dl_type] = filename
 
-    pdb.set_trace()
-
     return files
         
-
-
+def perform_zip(file_list, book_name):
+    zip = zipfile.ZipFile(download_directory + book_name + '.zip', 'w')
+    for dl_type, filename in file_list.items():
+        zip.write(filename, book_name + '.' + dl_type)
+    
+    zip.close()
 
 
 def main():
@@ -288,6 +291,9 @@ def main():
                                     # first download the files to a temporary location relative to grabpackt
                                     files = perform_download(session, book_id, links)
 
+                                    # next check if we need to zip the downloaded files
+                                    if config.email_zip:
+                                        perform_zip(files, book_name)
 
 
 
