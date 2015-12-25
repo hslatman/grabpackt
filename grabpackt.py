@@ -48,40 +48,60 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36',
 }
 
-# Argument parsing only takes care of a configuration file to be specified
-parser = argparse.ArgumentParser()
-parser.add_argument('--config', help='specify a configuration file to be read', required=False)
-args = parser.parse_args()
 
-# Determine the configuration file to use
-configuration_file = args.config if args.config else 'config.ini'
-
-# Check if the configuration file actually exists; exit if not.
-if not os.path.isfile(configuration_file):
-    print 'Please specify a configuration file or rename config.ini.dist to config.ini!'
-    sys.exit(1)
-
-# Reading configuration information
-config = ConfigParser.ConfigParser()
-config.read(configuration_file)
-
-# reading configuration variables
-username = config.get('packt', 'user')
-password = config.get('packt', 'pass')
-smtp_user = config.get('smtp', 'user')
-smtp_pass = config.get('smtp', 'pass')
-smtp_host = config.get('smtp', 'host')
-smtp_port = config.getint('smtp', 'port')
-email_to = config.get('mail', 'to')
-email_enabled = config.get('mail', 'send_mail')
-
-# static payload contains all static post data for login
-static_login_payload = {
-    'email': username, 'password': password, 'op': 'Login', 'form_id': form_id
-}
+# a minimal helper class for storing configuration keys and value
+class Config(dict):
+    pass
 
 
-def perform_login(session):
+def configure():
+    # Argument parsing only takes care of a configuration file to be specified
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config', help='specify a configuration file to be read', required=False)
+    args = parser.parse_args()
+
+    # Determine the configuration file to use
+    configuration_file = args.config if args.config else 'config.ini'
+
+    # Check if the configuration file actually exists; exit if not.
+    if not os.path.isfile(configuration_file):
+        print 'Please specify a configuration file or rename config.ini.dist to config.ini!'
+        sys.exit(1)
+
+    # Reading configuration information
+    configuration = ConfigParser.ConfigParser()
+    configuration.read(configuration_file)
+
+    # reading configuration variables
+    config = Config()
+    config.username =       configuration.get('packt', 'user')
+    config.password =       configuration.get('packt', 'pass')
+    config.smtp_user =      configuration.get('smtp', 'user')
+    config.smtp_pass =      configuration.get('smtp', 'pass')
+    config.smtp_host =      configuration.get('smtp', 'host')
+    config.smtp_port =      configuration.getint('smtp', 'port')
+    config.email_enabled =  configuration.getint('mail', 'send_mail')
+    
+    # only parse the rest when necessary
+    if config.email_enabled:
+        config.email_to =           configuration.get('mail', 'to')
+        config.email_types =        configuration.get('mail', 'types')
+        config.email_links_only =   configuration.getint('mail', 'links_only')
+        config.email_zip =          configuration.getint('mail', 'zip')
+        config.email_force_zip =    configuration.getint('mail', 'force_zip')
+        config.email_max_size =     configuration.getint('mail', 'max_size')
+        config.email_delete =       configuration.getint('mail', 'delete')
+
+    return config
+
+
+def perform_login(session, config):
+
+    # static payload contains all static post data for login. form_id is NOT the CSRF
+    static_login_payload = {
+        'email': config.username, 'password': config.password, 'op': 'Login', 'form_id': form_id
+    }
+
     # get the random form build id (CSRF):
     req = session.get(login_url)
     tree = etree.HTML(req.text, utf8_parser)
@@ -146,13 +166,16 @@ def perform_claim(session, claim_path):
 
 def main():
 
+    # parsing the configuration
+    config = configure()
+
     with requests.Session() as session:
 
         # set headers to something realistic; not Python requests...
         session.headers.update(headers)
 
         # perform the login
-        is_authenticated = perform_login(session)
+        is_authenticated = perform_login(session, config)
 
         if is_authenticated:
             
