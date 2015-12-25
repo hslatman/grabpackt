@@ -80,6 +80,23 @@ static_login_payload = {
     'email': username, 'password': password, 'op': 'Login', 'form_id': form_id
 }
 
+
+def perform_login(session):
+    # get the random form build id (CSRF):
+    req = session.get(login_url)
+    tree = etree.HTML(req.text, utf8_parser)
+    form_build_id = (tree.xpath(form_build_id_xpath)[0]).values()[2] # take second element to get the id...
+
+    # put form_id in payload for logging in and authenticate...
+    login_payload = static_login_payload
+    login_payload['form_build_id'] = form_build_id
+
+    # perform the login by doing the post...
+    req = session.post(login_url, data=login_payload)
+
+    return req.status_code == 200
+
+
 def main():
 
     with requests.Session() as s:
@@ -87,97 +104,89 @@ def main():
         # set headers to something realistic; not Python requests...
         s.headers.update(headers)
 
-        # get the random form build id (CSRF):
-        r = s.get(login_url)
-        tree = etree.HTML(r.text, utf8_parser)
-        form_build_id = (tree.xpath(form_build_id_xpath)[0]).values()[2] # take second element to get the id...
+        # perform the login
+        is_authenticated = perform_login(s)
 
-        # put form_id in payload for logging in and authenticate...
-        login_payload = static_login_payload
-        login_payload['form_build_id'] = form_build_id
-
-        # perform the login by doing the post...
-        r = s.post(login_url, data=login_payload)
-
-        # when logged in, navigate to the free learning page...
-        r = s.get(grab_url)
+        if is_authenticated:
+            # when logged in, navigate to the free learning page...
+            r = s.get(grab_url)
         
-        if r.status_code == 200:
+            if r.status_code == 200:
         
-            # parsing the new tree
-            free_learning_tree = etree.HTML(r.text, utf8_parser)
+                # parsing the new tree
+                free_learning_tree = etree.HTML(r.text, utf8_parser)
 
-            # extract data: a href with ids
-            claim_book_element = free_learning_tree.xpath(claim_book_xpath)
-            a_element = claim_book_element[0].getchildren()[0]
-            a_href = a_element.values()[0] # format: /freelearning-claim/{id1}/{id2}; id1 and id2 are numerical, length 5
+                # extract data: a href with ids
+                claim_book_element = free_learning_tree.xpath(claim_book_xpath)
+                a_element = claim_book_element[0].getchildren()[0]
+                a_href = a_element.values()[0] # format: /freelearning-claim/{id1}/{id2}; id1 and id2 are numerical, length 5
 
-            # get the exact book_id
-            book_id = a_href[1:].split('/')[1]
+                # get the exact book_id
+                book_id = a_href[1:].split('/')[1]
 
-            # check if we don't already own the book...
-            my_books = s.get(books_url)
-            book_list_element = etree.HTML(my_books.text, utf8_parser).xpath(book_list_xpath)[0]
-            book_elements = book_list_element.getchildren()
-            owned_book_ids = [int(book_element.get('nid')) for book_element in book_elements if book_element.get('nid') ]
+                # check if we don't already own the book...
+                my_books = s.get(books_url)
+                book_list_element = etree.HTML(my_books.text, utf8_parser).xpath(book_list_xpath)[0]
+                book_elements = book_list_element.getchildren()
+                owned_book_ids = [int(book_element.get('nid')) for book_element in book_elements if book_element.get('nid') ]
 
-            # when not previously owned, grab the book
-            if int(book_id) not in owned_book_ids:
+                # when not previously owned, grab the book
+                if int(book_id) not in owned_book_ids:
 
-                # construct the url to claim the book; redirect will take place
-                referer = grab_url
-                claim_url = login_url + a_href[1:]
-                s.headers.update({'referer': referer})
-                claim = s.get(claim_url)
+                    # construct the url to claim the book; redirect will take place
+                    referer = grab_url
+                    claim_url = login_url + a_href[1:]
+                    s.headers.update({'referer': referer})
+                    claim = s.get(claim_url)
 
 
 
-                # following is a redundant check; first verion of uniqueness; 
-                # TODO: might need some check for date..
-                # the book_id should be the nid of the first child of the list of books on the my-ebooks page
-                book_list_element = etree.HTML(claim.text, utf8_parser).xpath(book_list_xpath)[0]
-                first_book_element = book_list_element.getchildren()[0]
+                    # following is a redundant check; first verion of uniqueness; 
+                    # TODO: might need some check for date..
+                    # the book_id should be the nid of the first child of the list of books on the my-ebooks page
+                    book_list_element = etree.HTML(claim.text, utf8_parser).xpath(book_list_xpath)[0]
+                    first_book_element = book_list_element.getchildren()[0]
 
-                if str(book_id) in first_book_element.values(): # equivalent: first_book_element.get('nid') == str(book_id)
-                    # the newly claimed book id is indeed a new book (not claimed before)
-                    # determine what to do next...
-                    # download pdf/epub/mobi and/or code??
-                    # to some tmp file, with the name of the book (values[2])
-                    # or: email link/title of the new book...
-                    book_name = first_book_element.get('title')
+                    if str(book_id) in first_book_element.values(): # equivalent: first_book_element.get('nid') == str(book_id)
+                        # the newly claimed book id is indeed a new book (not claimed before)
+                        # determine what to do next...
+                        # download pdf/epub/mobi and/or code??
+                        # to some tmp file, with the name of the book (values[2])
+                        # or: email link/title of the new book...
+                        book_name = first_book_element.get('title')
 
  
-                    fromaddr = smtp_user
-                    toaddr = email_to
+                        fromaddr = smtp_user
+                        toaddr = email_to
  
-                    msg = MIMEMultipart()
+                        msg = MIMEMultipart()
  
-                    msg['From'] = fromaddr
-                    msg['To'] = toaddr
-                    msg['Subject'] = "GrabPackt: " + book_name
+                        msg['From'] = fromaddr
+                        msg['To'] = toaddr
+                        msg['Subject'] = "GrabPackt: " + book_name
  
-                    body = "A new book was claimed by GrabPackt, called " + book_name
-                    msg.attach(MIMEText(body, 'plain'))
+                        body = "A new book was claimed by GrabPackt, called " + book_name
+                        msg.attach(MIMEText(body, 'plain'))
  
-                    #filename = "NAME OF THE FILE WITH ITS EXTENSION"
-                    #attachment = open("PATH OF THE FILE", "rb")
+                        #filename = "NAME OF THE FILE WITH ITS EXTENSION"
+                        #attachment = open("PATH OF THE FILE", "rb")
  
-                    #part = MIMEBase('application', 'octet-stream')
-                    #part.set_payload((attachment).read())
-                    #encoders.encode_base64(part)
-                    #part.add_header('Content-Disposition', "attachment; filename= %s" % filename)
+                        #part = MIMEBase('application', 'octet-stream')
+                        #part.set_payload((attachment).read())
+                        #encoders.encode_base64(part)
+                        #part.add_header('Content-Disposition', "attachment; filename= %s" % filename)
  
-                    #msg.attach(part)
+                        #msg.attach(part)
  
-                    server = smtplib.SMTP(smtp_host, smtp_port)
-                    server.starttls()
-                    server.login(fromaddr, smtp_pass)
-                    text = msg.as_string()
-                    server.sendmail(fromaddr, toaddr, text)
-                    server.quit()
+                        server = smtplib.SMTP(smtp_host, smtp_port)
+                        server.starttls()
+                        server.login(fromaddr, smtp_pass)
+                        text = msg.as_string()
+                        server.sendmail(fromaddr, toaddr, text)
+                        server.quit()
 
-            else:
-                print "book already owned!"
+                else:
+                    print "book already owned!"
         
 
 if __name__ == "__main__":
