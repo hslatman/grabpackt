@@ -97,41 +97,68 @@ def perform_login(session):
     return req.status_code == 200
 
 
+def perform_relocate(session):
+    # when logged in, navigate to the free learning page...
+    req = session.get(grab_url)
+        
+    return req.status_code == 200, req.text
+
+
+def get_owned_book_ids(session):
+    # navigate to the owned books list
+    my_books = session.get(books_url)
+
+    # get the element that contains the list of books and then all of its childeren
+    book_list_element = etree.HTML(my_books.text, utf8_parser).xpath(book_list_xpath)[0]
+    book_elements = book_list_element.getchildren()
+
+    # iterate all of the book elements, getting and converting the nid if it exists
+    owned_book_ids = [int(book_element.get('nid')) for book_element in book_elements if book_element.get('nid') ]
+
+    return owned_book_ids
+
+
+def get_book_id(contents):
+    # parsing the new tree
+    free_learning_tree = etree.HTML(contents, utf8_parser)
+
+    # extract data: a href with ids
+    claim_book_element = free_learning_tree.xpath(claim_book_xpath)
+    a_element = claim_book_element[0].getchildren()[0]
+    a_href = a_element.values()[0] # format: /freelearning-claim/{id1}/{id2}; id1 and id2 are numerical, length 5
+
+    # get the exact book_id
+    book_id = a_href[1:].split('/')[1]
+
+    return book_id
+
+
 def main():
 
-    with requests.Session() as s:
+    with requests.Session() as session:
 
         # set headers to something realistic; not Python requests...
-        s.headers.update(headers)
+        session.headers.update(headers)
 
         # perform the login
-        is_authenticated = perform_login(s)
+        is_authenticated = perform_login(session)
 
         if is_authenticated:
-            # when logged in, navigate to the free learning page...
-            r = s.get(grab_url)
+            
+            # perform the relocation to the free grab page
+            page_available, page_contents = perform_relocate(session)
         
-            if r.status_code == 200:
-        
-                # parsing the new tree
-                free_learning_tree = etree.HTML(r.text, utf8_parser)
+            # if the page is availbale (status code equaled 200), perform the rest of the process
+            if page_available:
 
-                # extract data: a href with ids
-                claim_book_element = free_learning_tree.xpath(claim_book_xpath)
-                a_element = claim_book_element[0].getchildren()[0]
-                a_href = a_element.values()[0] # format: /freelearning-claim/{id1}/{id2}; id1 and id2 are numerical, length 5
+                # extract the new book id from the page contents
+                new_book_id = get_book_id(page_contents)
 
-                # get the exact book_id
-                book_id = a_href[1:].split('/')[1]
-
-                # check if we don't already own the book...
-                my_books = s.get(books_url)
-                book_list_element = etree.HTML(my_books.text, utf8_parser).xpath(book_list_xpath)[0]
-                book_elements = book_list_element.getchildren()
-                owned_book_ids = [int(book_element.get('nid')) for book_element in book_elements if book_element.get('nid') ]
+                # get a list of the IDs of all the books already owned
+                owned_book_ids = get_owned_book_ids(session)
 
                 # when not previously owned, grab the book
-                if int(book_id) not in owned_book_ids:
+                if int(new_book_id) not in owned_book_ids:
 
                     # construct the url to claim the book; redirect will take place
                     referer = grab_url
