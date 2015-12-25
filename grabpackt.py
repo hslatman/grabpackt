@@ -48,6 +48,9 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36',
 }
 
+# the location for the temporary download location
+download_directory = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'tmp' + os.sep
+
 
 # a minimal helper class for storing configuration keys and value
 class Config(dict):
@@ -171,29 +174,55 @@ def prepare_links(book_element, config):
 
     # list of valid option links
     valid_option_links = {
-        'p': '/ebook_download/' + book_id + '/pdf',
-        'e': '/ebook_download/' + book_id + '/epub',
-        'm': '/ebook_download/' + book_id + '/mobi',
-        'c': '/code_download/' + str(int(book_id) + 1)
+        'p': ('pdf',  '/ebook_download/' + book_id + '/pdf'),
+        'e': ('epub', '/ebook_download/' + book_id + '/epub'),
+        'm': ('mobi', '/ebook_download/' + book_id + '/mobi'),
+        'c': ('code', '/code_download/' + str(int(book_id) + 1))
     }
 
     # get the available links for the book
     available_links = book_element.xpath('.//a/@href')
 
     # get the links that should be executed
-    links = []
+    links = {}
     for option in list(str(config.email_types)):
         if option in list("pemc"):
             # perform the option, e.g. get the pdf, epub, mobi and/or code link
-            link = valid_option_links[option]
+            dl_type, link = valid_option_links[option]
 
             # check if the link can actually be found on the page (it exists)
             if link in available_links:
                 # each of the links has to be prefixed with the login_url
-                links.append(login_url + link[1:])
-
+                links[dl_type] = login_url + link[1:]
 
     return links
+
+
+def perform_download(session, book_id, links):
+    if not os.path.exists(download_directory):
+        os.makedirs(download_directory)
+    files = {}
+    for dl_type, link in links.items():
+        filename = download_directory + book_id + '.' + dl_type
+
+        # don't download files more than once if not necessary...
+        if not os.path.exists(filename):
+            req = session.get(link, stream=True)
+            with open(filename, 'wb') as f:
+                for chunk in req.iter_content(chunk_size=1024): 
+                    if chunk: # filter out keep-alive new chunks
+                        f.write(chunk)
+                        #f.flush()
+    
+        files[dl_type] = filename
+
+    pdb.set_trace()
+
+    return files
+        
+
+
+
 
 def main():
 
@@ -255,6 +284,10 @@ def main():
  
                                 # if we only want the links, we're basically ready for sending an email
                                 # else we need some more juggling downloading the goodies
+                                if not config.email_links_only:
+                                    # first download the files to a temporary location relative to grabpackt
+                                    files = perform_download(session, book_id, links)
+
 
 
 
