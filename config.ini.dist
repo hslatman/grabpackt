@@ -14,6 +14,7 @@ pass = password
 
 # Settings for the mail that is received
 [mail]
+send_mail = 1
 to = johndoe@example.com    # Address to send mail to.
 types = pemc                # Which file types: (p)df, (e)pub, (m)obi and/or (c)ode.
 links_only = 0              # Set to true to not receive attachments, only links.

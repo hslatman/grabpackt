@@ -73,6 +73,7 @@ smtp_pass = config.get('smtp', 'pass')
 smtp_host = config.get('smtp', 'host')
 smtp_port = config.getint('smtp', 'port')
 email_to = config.get('mail', 'to')
+email_enabled = config.get('mail', 'send_mail')
 
 # static payload contains all static post data for login
 static_login_payload = {
