@@ -80,17 +80,17 @@ def configure():
     config.smtp_pass =      configuration.get('smtp', 'pass')
     config.smtp_host =      configuration.get('smtp', 'host')
     config.smtp_port =      configuration.getint('smtp', 'port')
-    config.email_enabled =  configuration.getint('mail', 'send_mail')
+    config.email_enabled =  configuration.getboolean('mail', 'send_mail')
     
     # only parse the rest when necessary
     if config.email_enabled:
         config.email_to =           configuration.get('mail', 'to')
         config.email_types =        configuration.get('mail', 'types')
-        config.email_links_only =   configuration.getint('mail', 'links_only')
-        config.email_zip =          configuration.getint('mail', 'zip')
-        config.email_force_zip =    configuration.getint('mail', 'force_zip')
+        config.email_links_only =   configuration.getboolean('mail', 'links_only')
+        config.email_zip =          configuration.getboolean('mail', 'zip')
+        config.email_force_zip =    configuration.getboolean('mail', 'force_zip')
         config.email_max_size =     configuration.getint('mail', 'max_size')
-        config.email_delete =       configuration.getint('mail', 'delete')
+        config.email_delete =       configuration.getboolean('mail', 'delete')
 
     return config
 
@@ -164,6 +164,37 @@ def perform_claim(session, claim_path):
     return req.status_code == 200, req.text
 
 
+def prepare_links(book_element, config):
+
+    # get the book id
+    book_id = str(book_element.get('nid'))
+
+    # list of valid option links
+    valid_option_links = {
+        'p': '/ebook_download/' + book_id + '/pdf',
+        'e': '/ebook_download/' + book_id + '/epub',
+        'm': '/ebook_download/' + book_id + '/mobi',
+        'c': '/code_download/' + str(int(book_id) + 1)
+    }
+
+    # get the available links for the book
+    available_links = book_element.xpath('.//a/@href')
+
+    # get the links that should be executed
+    links = []
+    for option in list(str(config.email_types)):
+        if option in list("pemc"):
+            # perform the option, e.g. get the pdf, epub, mobi and/or code link
+            link = valid_option_links[option]
+
+            # check if the link can actually be found on the page (it exists)
+            if link in available_links:
+                # each of the links has to be prefixed with the login_url
+                links.append(login_url + link[1:])
+
+
+    return links
+
 def main():
 
     # parsing the configuration
@@ -192,56 +223,69 @@ def main():
                 owned_book_ids = get_owned_book_ids(session)
 
                 # when not previously owned, grab the book
-                if int(new_book_id) not in owned_book_ids:
+                if int(new_book_id)+1 not in owned_book_ids:
 
                     # perform the claim
                     has_claimed, claim_text = perform_claim(session, claim_path)
 
                     if has_claimed:
 
-                        # following is a redundant check; first verion of uniqueness; 
-                        # TODO: might need some check for date..
-                        # the book_id should be the nid of the first child of the list of books on the my-ebooks page
-                        book_list_element = etree.HTML(claim_text, utf8_parser).xpath(book_list_xpath)[0]
-                        first_book_element = book_list_element.getchildren()[0]
+                        if config.email_enabled:
 
-                        if first_book_element.get('nid') == str(new_book_id): # equivalent: str(book_id) in first_book_element.values()
-                            # the newly claimed book id is indeed a new book (not claimed before)
-                            # determine what to do next...
-                            # download pdf/epub/mobi and/or code??
-                            # to some tmp file, with the name of the book (values[2])
-                            # or: email link/title of the new book...
-                            book_name = first_book_element.get('title')
+                            # following is a redundant check; first verion of uniqueness; 
+                            # TODO: might need some check for date..
+                            # the book_id should be the nid of the first child of the list of books on the my-ebooks page
+                            book_list_element = etree.HTML(claim_text, utf8_parser).xpath(book_list_xpath)[0]
+                            first_book_element = book_list_element.getchildren()[0]
 
+                            if first_book_element.get('nid') == str(new_book_id): # equivalent: str(book_id) in first_book_element.values()
+                                # the newly claimed book id is indeed a new book (not claimed before)
+                                # determine what to do next...
+                                # download pdf/epub/mobi and/or code??
+                                # to some tmp file, with the name of the book (values[2])
+                                # or: email link/title of the new book...
+                                book_element = first_book_element
+                                book_id = new_book_id
+
+                                # extract the name of the book
+                                book_name = book_element.get('title')
+
+                                # get the links that should be downloaded and/or listed in mail
+                                links = prepare_links(book_element, config)
  
-                            fromaddr = smtp_user
-                            toaddr = email_to
+                                # if we only want the links, we're basically ready for sending an email
+                                # else we need some more juggling downloading the goodies
+
+
+
+                                fromaddr = smtp_user
+                                toaddr = email_to
  
-                            msg = MIMEMultipart()
+                                msg = MIMEMultipart()
  
-                            msg['From'] = fromaddr
-                            msg['To'] = toaddr
-                            msg['Subject'] = "GrabPackt: " + book_name
+                                msg['From'] = fromaddr
+                                msg['To'] = toaddr
+                                msg['Subject'] = "GrabPackt: " + book_name
  
-                            body = "A new book was claimed by GrabPackt, called " + book_name
-                            msg.attach(MIMEText(body, 'plain'))
+                                body = "A new book was claimed by GrabPackt, called " + book_name
+                                msg.attach(MIMEText(body, 'plain'))
  
-                            #filename = "NAME OF THE FILE WITH ITS EXTENSION"
-                            #attachment = open("PATH OF THE FILE", "rb")
+                                #filename = "NAME OF THE FILE WITH ITS EXTENSION"
+                                #attachment = open("PATH OF THE FILE", "rb")
  
-                            #part = MIMEBase('application', 'octet-stream')
-                            #part.set_payload((attachment).read())
-                            #encoders.encode_base64(part)
-                            #part.add_header('Content-Disposition', "attachment; filename= %s" % filename)
+                                #part = MIMEBase('application', 'octet-stream')
+                                #part.set_payload((attachment).read())
+                                #encoders.encode_base64(part)
+                                #part.add_header('Content-Disposition', "attachment; filename= %s" % filename)
  
-                            #msg.attach(part)
+                                #msg.attach(part)
  
-                            server = smtplib.SMTP(smtp_host, smtp_port)
-                            server.starttls()
-                            server.login(fromaddr, smtp_pass)
-                            text = msg.as_string()
-                            server.sendmail(fromaddr, toaddr, text)
-                            server.quit()
+                                server = smtplib.SMTP(smtp_host, smtp_port)
+                                server.starttls()
+                                server.login(fromaddr, smtp_pass)
+                                text = msg.as_string()
+                                server.sendmail(fromaddr, toaddr, text)
+                                server.quit()
 
                 else:
                     print "book already owned!"
