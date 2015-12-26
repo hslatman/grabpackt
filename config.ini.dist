@@ -13,15 +13,25 @@ user = janedoe@example.com
 pass = password
 
 # Settings for the mail that is received
+
+# send_mail:    Enable or disable sending emails.
+# to:           Address to send mail to.
+# types:        Which file types: (p)df, (e)pub, (m)obi and/or (c)ode.
+# links_only:   Set to true to not receive attachments, only links.
+# zip:          When true, selected file types are packaged in zip.
+# force_zip:    When true, a zip is created for a single file also.
+# max_size:     The maximum file size of (combined) attachment(s) in MB.
+# delete:       When true, delete the files when done. Zip is always deleted.
+
 [mail]
 send_mail = 1
-to = johndoe@example.com    # Address to send mail to.
-types = pemc                # Which file types: (p)df, (e)pub, (m)obi and/or (c)ode.
-links_only = 0              # Set to true to not receive attachments, only links.
-zip = 0                     # When true, selected file types are packaged in zip.
-force_zip = 0               # When true, a zip is created for a single file also.
-max_size = 10               # The maximum file size of (combined) attachment(s) in MB.
-delete = 1                  # When true, delete the files and/or zip when done.
+to = johndoe@example.com    
+types = pemc                
+links_only = 0              
+zip = 0                     
+force_zip = 0               
+max_size = 10               
+delete = 1                  
 
 
 
