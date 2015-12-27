@@ -35,4 +35,4 @@ Feel free to fork and create fixes or additions. Shoot a PR when done.
 
 ## License
 
-Licensed under GPLv3.
+Licensed under [GPLv3](LICENSE).
