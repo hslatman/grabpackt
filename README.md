@@ -16,9 +16,11 @@ Change usernames, passwords and emails to your personal ones.
 
 ## Usage
 
-Run with: $ python grabpackt.py.
+It's as simple as: $ python grabpackt.py.
 
 The best way to use this is to schedule a task or cron job on a daily basis.
+At the moment the script will check if you did claim a new book, and will not continue 
+(thus not notify  you) if you obtained one that was already in your library.
 
 Optionally, you can specify a different configuration file to use with the --config flag.
 
@@ -27,7 +29,10 @@ Optionally, you can specify a different configuration file to use with the --con
   * Providing detailed documentation
   * PyLinting
   * Some tests
-  * Logging (+ tests)
+  * Logging
+  * Testing (Python 3 likely to work, not entirely atm)
+  * Nice HTML email (+ plain switch)
+  * Send email when obtained book already in library
   
 ## Contributors
 
