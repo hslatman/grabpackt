@@ -325,28 +325,10 @@ def create_message(config, book_name, links, attachments):
     msg['To'] = toaddr
     msg['Subject'] = "GrabPackt: " + book_name
 
-    #body = "A new book was claimed by GrabPackt, called " + book_name
-    #body += "<br><br>"
-    #body += "Links:"
-    #body += "<br>"
-
-    #if 'pdf' in links.keys():
-    #    body += '<a href="'+links['pdf']+'">PDF</a>'
-    #    body += '<br>'
-    #if 'epub' in links.keys():
-    #    body += '<a href="'+links['epub']+'">EPUB</a>'
-    #    body += '<br>'
-    #if 'mobi' in links.keys():
-    #    body += '<a href="'+links['mobi']+'">MOBI</a>'
-    #    body += '<br>'
-    #if 'code' in links.keys():
-    #    body += '<a href="'+links['code']+'">CODE</a>'
-    #    body += '<br>'
-
-
+    # get the body by creating an html mail
     body = html_mail(book_name, links)
 
-
+    # attach the body
     msg.attach(MIMEText(body, 'html'))
 
     # check if we need to do attachments
@@ -443,7 +425,7 @@ def main():
                 owned_book_ids = get_owned_book_ids(session)
 
                 # when not previously owned, grab the book
-                if int(new_book_id)+1 not in owned_book_ids:
+                if int(new_book_id) not in owned_book_ids:
 
                     # perform the claim
                     has_claimed, claim_text = claim(session, claim_path)
