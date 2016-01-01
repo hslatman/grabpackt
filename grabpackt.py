@@ -439,7 +439,7 @@ def main():
                 owned_book_ids = get_owned_book_ids(session)
 
                 # when not previously owned, grab the book
-                if int(new_book_id)+1 not in owned_book_ids:
+                if int(new_book_id) not in owned_book_ids:
 
                     # perform the claim
                     has_claimed, claim_text = claim(session, claim_path)
