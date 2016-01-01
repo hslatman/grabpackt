@@ -259,7 +259,7 @@ def create_message(config, book_name, links, attachments):
     fromaddr = config.smtp_user
     toaddr = config.email_to
  
-    msg = MIMEMultipart('alternative')
+    msg = MIMEMultipart()
  
     msg['From'] = fromaddr
     msg['To'] = toaddr
@@ -299,7 +299,7 @@ def create_message(config, book_name, links, attachments):
                 part = MIMEBase('application', 'octet-stream')
                 part.set_payload((attachment).read())
                 encoders.encode_base64(part)
-                part.add_header('Content-Disposition', "attachment; filename= " + mail_filename)
+                part.add_header('Content-Disposition', 'attachment; filename="{0}"'.format(mail_filename))
 
                 msg.attach(part)
         
@@ -308,12 +308,12 @@ def create_message(config, book_name, links, attachments):
             for dl_type, filename in attachments.items():
 
                 with open(filename, 'rb') as attachment:
-                    mail_filename = book_name + '.' + dl_type if dl_type != 'code' else 'zip'
+                    mail_filename = book_name + '.' + dl_type if dl_type != 'code' else book_name + '.zip'
  
                     part = MIMEBase('application', 'octet-stream')
                     part.set_payload((attachment).read())
                     encoders.encode_base64(part)
-                    part.add_header('Content-Disposition', "attachment; filename= " + mail_filename)
+                    part.add_header('Content-Disposition', 'attachment; filename="{0}"'.format(mail_filename))
  
                     msg.attach(part)
  
