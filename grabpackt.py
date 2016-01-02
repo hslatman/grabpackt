@@ -149,7 +149,7 @@ def get_owned_book_ids(session):
     book_elements = book_list_element.getchildren()
 
     # iterate all of the book elements, getting and converting the nid if it exists
-    owned_book_ids = [int(book_element.get('nid')) for book_element in book_elements if book_element.get('nid')]
+    owned_book_ids = {int(book_element.get('nid')): book_element.get('title') for book_element in book_elements if book_element.get('nid')}
 
     return owned_book_ids
 
@@ -308,7 +308,7 @@ def prepare_attachments(config, files, zip_filename=""):
 
 
 
-def create_message(config, book_name, links, attachments):
+def create_message(config, book_name, links, attachments, is_new_book):
     """Construct a MIME message.
 
     config -- the configuration object
@@ -325,24 +325,10 @@ def create_message(config, book_name, links, attachments):
     msg['To'] = toaddr
     msg['Subject'] = "GrabPackt: " + book_name
 
-    body = "A new book was claimed by GrabPackt, called " + book_name
-    body += "<br><br>"
-    body += "Links:"
-    body += "<br>"
+    # get the body by creating an html mail
+    body = html_mail(book_name, links, is_new_book)
 
-    if 'pdf' in links.keys():
-        body += '<a href="'+links['pdf']+'">PDF</a>'
-        body += '<br>'
-    if 'epub' in links.keys():
-        body += '<a href="'+links['epub']+'">EPUB</a>'
-        body += '<br>'
-    if 'mobi' in links.keys():
-        body += '<a href="'+links['mobi']+'">MOBI</a>'
-        body += '<br>'
-    if 'code' in links.keys():
-        body += '<a href="'+links['code']+'">CODE</a>'
-        body += '<br>'
-
+    # attach the body
     msg.attach(MIMEText(body, 'html'))
 
     # check if we need to do attachments
@@ -410,6 +396,41 @@ def cleanup(config, files, zip_filename=""):
             if os.path.exists(filename):
                 os.remove(filename)
 
+
+def html_mail(book_title, links, is_new_book):
+    """Creates a neat looking HTML formatted message.
+    
+    Keyword arguments:
+    book_title -- the title of the book
+    links -- a dictionary of requested links
+    is_new_book -- boolean that indicates whether the book was newly claimed or not
+    """
+    template_file = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'template.html'
+    html = "" 
+    with open(template_file, 'rb') as handle:
+        html = handle.read()
+
+    # replace the title of the book
+    html = html.replace('{{REPLACE_TITLE}}', book_title.replace(' [eBook]', ''))
+
+    if is_new_book:
+        if len(links.keys()) > 0:
+            a_parts = []
+            for dl_type, link in links.items():
+                a_parts.append('<a href="{0}" target="_blank">{1}</a>'.format(link, dl_type.upper()))
+        
+            link_parts = "   |   ".join(a_parts)
+            html = html.replace('{{REPLACE_LINKS}}', link_parts)
+
+        else: 
+            html = html.replace('{{REPLACE_LINKS}}', 'No links found.')
+    else:
+        # the book was not newly claimed; create appropriate message.
+        html = html.replace('{{REPLACE_LINKS}}', 'You already owned this book.')
+
+    return html
+
+
 def main():
     """Performs all of the logic."""
 
@@ -439,7 +460,7 @@ def main():
                 owned_book_ids = get_owned_book_ids(session)
 
                 # when not previously owned, grab the book
-                if int(new_book_id) not in owned_book_ids:
+                if int(new_book_id) not in owned_book_ids.keys():
 
                     # perform the claim
                     has_claimed, claim_text = claim(session, claim_path)
@@ -459,7 +480,7 @@ def main():
                                 book_id = new_book_id
 
                                 # extract the name of the book
-                                book_name = book_element.get('title')
+                                book_title = book_element.get('title')
 
                                 # get the links that should be downloaded and/or listed in mail
                                 links = prepare_links(config, book_element)
@@ -476,20 +497,34 @@ def main():
                                     if config.email_zip:
                                         # only pack files when there is more than 1, or has been enforced
                                         if len(files) > 1 or config.email_force_zip:
-                                            zip_filename = create_zip(files, book_name)
+                                            zip_filename = create_zip(files, book_title)
 
 
                                 # prepare attachments for sending
                                 attachments = prepare_attachments(config, files, zip_filename)
 
                                 # construct the email with all necessary items...
-                                message = create_message(config, book_name, links, attachments)
+                                message = create_message(config, book_title, links, attachments, is_new_book=True)
 
                                 # send the email...
                                 send_message(config, message)
 
                                 # perform cleanup
                                 cleanup(config, files, zip_filename)
+
+                else:
+                    # we already owned the book; send a mail that we already owned the book
+                    if config.email_enabled:
+                        # pick the book_id entry from owned_book_ids
+                        book_title = owned_book_ids[int(new_book_id)].replace(' [eBook]', '')
+
+                        # create a message with empty links and attachments
+                        links = attachments = {}
+                        message = create_message(config, book_title, links, attachments, is_new_book=False)
+
+                        # send the message; no cleanup necessary!
+                        send_message(config, message)
+                                                   
 
 if __name__ == "__main__":
     main()
