@@ -1,4 +1,4 @@
-# Sample configuration file for PacktGrab
+# Sample configuration file for GrabPackt.py
 
 # Packt Publishing credentials
 [packt]
@@ -24,14 +24,14 @@ pass = password
 # delete:       When true, delete the files when done. Zip is always deleted.
 
 [mail]
-send_mail = 1
+send_mail = true
 to = johndoe@example.com    
 types = pemc                
-links_only = 0              
-zip = 0                     
-force_zip = 0               
+links_only = false              
+zip = false                     
+force_zip = false               
 max_size = 10               
-delete = 1                  
+delete = true                  
 
 
 
