@@ -31,8 +31,8 @@ Optionally, you can specify a different configuration file to use with the --con
   * Some tests
   * Logging
   * Testing (Python 3 likely to work, not entirely atm)
-  * Nice HTML email (+ plain switch)
-  * Send email when obtained book already in library
+  * ~~HTML email~~
+  * ~~Send email when obtained book already in library~~
   
 ## Contributors
 
