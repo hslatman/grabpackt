@@ -9,21 +9,29 @@
 #   Author: Herman Slatman (https://hermanslatman.nl)
 #
 ########################################################################
+from __future__ import print_function
 
 import requests
-import ConfigParser
 import argparse
 import os
 import sys
 import smtplib
 import zipfile
+import codecs
 
 from lxml import etree
 
-from email.MIMEMultipart import MIMEMultipart
-from email.MIMEText import MIMEText
-from email.MIMEBase import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
 from email import encoders
+
+try:
+    # 3.x name
+    import configparser
+except ImportError:
+    # 2.x name
+    import ConfigParser as configparser
 
 # relevant urls
 LOGIN_URL = "https://www.packtpub.com/"
@@ -69,11 +77,11 @@ def configure():
 
     # Check if the configuration file actually exists; exit if not.
     if not os.path.isfile(configuration_file):
-        print 'Please specify a configuration file or rename config.ini.dist to config.ini!'
+        print('Please specify a configuration file or rename config.ini.dist to config.ini!')
         sys.exit(1)
 
     # Reading configuration information
-    configuration = ConfigParser.ConfigParser()
+    configuration = configparser.ConfigParser()
     configuration.read(configuration_file)
 
     # reading configuration variables
@@ -407,26 +415,26 @@ def html_mail(book_title, links, is_new_book):
     """
     template_file = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'template.html'
     html = "" 
-    with open(template_file, 'rb') as handle:
+    with open(template_file, 'r') as handle:
         html = handle.read()
 
     # replace the title of the book
-    html = html.replace('{{REPLACE_TITLE}}', book_title.replace(' [eBook]', ''))
+    html = html.replace(u'{{REPLACE_TITLE}}', book_title.replace(u' [eBook]', u''))
 
     if is_new_book:
         if len(links.keys()) > 0:
             a_parts = []
             for dl_type, link in links.items():
-                a_parts.append('<a href="{0}" target="_blank">{1}</a>'.format(link, dl_type.upper()))
+                a_parts.append(u'<a href="{0}" target="_blank">{1}</a>'.format(link, dl_type.upper()))
         
-            link_parts = "   |   ".join(a_parts)
-            html = html.replace('{{REPLACE_LINKS}}', link_parts)
+            link_parts = u"   |   ".join(a_parts)
+            html = html.replace(u'{{REPLACE_LINKS}}', link_parts)
 
         else: 
-            html = html.replace('{{REPLACE_LINKS}}', 'No links found.')
+            html = html.replace(u'{{REPLACE_LINKS}}', u'No links found.')
     else:
         # the book was not newly claimed; create appropriate message.
-        html = html.replace('{{REPLACE_LINKS}}', 'You already owned this book.')
+        html = html.replace(u'{{REPLACE_LINKS}}', u'You already owned this book.')
 
     return html
 
