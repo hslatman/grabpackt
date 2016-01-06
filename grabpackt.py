@@ -383,8 +383,59 @@ def send_message(config, message):
     server = smtplib.SMTP(config.smtp_host, config.smtp_port)
     server.starttls()
     server.login(config.smtp_user, config.smtp_pass)
-    server.sendmail(config.smtp_user, config.email_to, message.as_string())
+
+    try:
+        server.sendmail(config.smtp_user, config.email_to, message.as_string())
+    except (smtplib.SMTPDataError, smtplib.SMTPSenderRefused) as err:
+        # first, make sure we nicely close the server
+        server.quit()
+
+        # handle the error message 
+        handle_error_message(config, err)
+
+        # return from the function
+        return False
+        
+        
     server.quit()
+
+    return True
+
+
+def handle_error_message(config, err):
+    """Handles SMTP error messages and constructs appropriate mail.
+
+    Keyword arguments:
+    config -- the configuration object
+    err -- an SMTPDataError or SMTPSenderRefused error
+    """
+    code, resp = err[:2]
+    is_sender_refused_error = isinstance(err, smtplib.SMTPSenderRefused)
+    
+    # construct the plain text body
+    body = 'Your book was claimed, but could not be delivered by mail.'
+    if is_sender_refused_error:
+        from_addr = err[2]
+        body += ' This is likely due to size limits.'
+    else:
+        body += ' This is likely due to attachment restrictions.'
+
+    fromaddr = config.smtp_user
+    toaddr = config.email_to
+
+    msg = MIMEMultipart()
+
+    msg['From'] = fromaddr
+    msg['To'] = toaddr
+    msg['Subject'] = "GrabPackt book claimed!"
+
+    # attach the body
+    msg.attach(MIMEText(body, 'plain'))
+
+    # send the message
+    # send_error_message(config, msg)
+    send_message(config, msg)
+
 
 def cleanup(config, files, zip_filename=""):
     """Removes temporary downloaded files.
