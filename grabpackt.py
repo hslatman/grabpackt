@@ -57,7 +57,8 @@ HEADERS = {
 }
 
 # the location for the temporary download location
-DOWNLOAD_DIRECTORY = os.path.dirname(os.path.realpath(__file__)) + os.sep + 'tmp' + os.sep
+BASE_DIRECTORY = os.path.dirname(os.path.realpath(__file__)) + os.sep
+DOWNLOAD_DIRECTORY = BASE_DIRECTORY + 'tmp' + os.sep
 
 
 # a minimal helper class for storing configuration keys and value
@@ -73,7 +74,7 @@ def configure():
     args = parser.parse_args()
 
     # Determine the configuration file to use
-    configuration_file = args.config if args.config else 'config.ini'
+    configuration_file = os.path.join(BASE_DIRECTORY, args.config) if args.config else BASE_DIRECTORY + 'config.ini'
 
     # Check if the configuration file actually exists; exit if not.
     if not os.path.isfile(configuration_file):
