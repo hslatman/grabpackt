@@ -374,7 +374,7 @@ def create_message(config, book_name, links, attachments, is_new_book):
 
     return msg
 
-def send_message(config, message):
+def send_message(config, message, book_name):
     """Sends a MIME message via SMTP.
 
     Keyword arguments:
@@ -392,7 +392,7 @@ def send_message(config, message):
         server.quit()
 
         # handle the error message 
-        handle_error_message(config, err)
+        handle_error_message(config, err, book_name)
 
         # return from the function
         return False
@@ -403,7 +403,7 @@ def send_message(config, message):
     return True
 
 
-def handle_error_message(config, err):
+def handle_error_message(config, err, book_name):
     """Handles SMTP error messages and constructs appropriate mail.
 
     Keyword arguments:
@@ -421,6 +421,8 @@ def handle_error_message(config, err):
     else:
         body += ' This is likely due to attachment restrictions.'
 
+    body += ' Book: ' + book_name
+
     fromaddr = config.smtp_user
     toaddr = config.email_to
 
@@ -435,7 +437,7 @@ def handle_error_message(config, err):
 
     # send the message
     # send_error_message(config, msg)
-    send_message(config, msg)
+    send_message(config, msg, book_name)
 
 
 def cleanup(config, files, zip_filename=""):
@@ -486,7 +488,7 @@ def html_mail(book_title, links, is_new_book):
             html = html.replace(u'{{REPLACE_LINKS}}', u'No links found.')
     else:
         # the book was not newly claimed; create appropriate message.
-        html = html.replace(u'{{REPLACE_LINKS}}', u'You already owned this book.')
+        html = html.replace(u'{{REPLACE_LINKS}}', u'You already own this book.')
 
     return html
 
@@ -567,7 +569,7 @@ def main():
                                 message = create_message(config, book_title, links, attachments, is_new_book=True)
 
                                 # send the email...
-                                send_message(config, message)
+                                send_message(config, message, book_title)
 
                                 # perform cleanup
                                 cleanup(config, files, zip_filename)
@@ -583,7 +585,7 @@ def main():
                         message = create_message(config, book_title, links, attachments, is_new_book=False)
 
                         # send the message; no cleanup necessary!
-                        send_message(config, message)
+                        send_message(config, message, book_title)
                                                    
 
 if __name__ == "__main__":
