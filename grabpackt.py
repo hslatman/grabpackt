@@ -317,7 +317,7 @@ def prepare_attachments(config, files, zip_filename=""):
 
 
 
-def create_message(config, book_name, links, attachments, is_new_book):
+def create_message(config, book_name, links, attachments, is_new_book, is_error=False):
     """Construct a MIME message.
 
     config -- the configuration object
@@ -335,7 +335,7 @@ def create_message(config, book_name, links, attachments, is_new_book):
     msg['Subject'] = "GrabPackt: " + book_name
 
     # get the body by creating an html mail
-    body = html_mail(book_name, links, is_new_book)
+    body = html_mail(book_name, links, is_new_book, is_error)
 
     # attach the body
     msg.attach(MIMEText(body, 'html'))
@@ -374,7 +374,7 @@ def create_message(config, book_name, links, attachments, is_new_book):
 
     return msg
 
-def send_message(config, message, book_name):
+def send_message(config, message, book_name, links, is_new_book):
     """Sends a MIME message via SMTP.
 
     Keyword arguments:
@@ -392,7 +392,7 @@ def send_message(config, message, book_name):
         server.quit()
 
         # handle the error message 
-        handle_error_message(config, err, book_name)
+        handle_error_message(config, err, book_name, links, is_new_book)
 
         # return from the function
         return False
@@ -403,7 +403,7 @@ def send_message(config, message, book_name):
     return True
 
 
-def handle_error_message(config, err, book_name):
+def handle_error_message(config, err, book_name, links, is_new_book):
     """Handles SMTP error messages and constructs appropriate mail.
 
     Keyword arguments:
@@ -414,30 +414,34 @@ def handle_error_message(config, err, book_name):
     is_sender_refused_error = isinstance(err, smtplib.SMTPSenderRefused)
     
     # construct the plain text body
-    body = 'Your book was claimed, but could not be delivered by mail.'
-    if is_sender_refused_error:
-        from_addr = err[2]
-        body += ' This is likely due to size limits.'
-    else:
-        body += ' This is likely due to attachment restrictions.'
+    #body = 'Your book was claimed, but could not be delivered by mail.'
+    #if is_sender_refused_error:
+    #    from_addr = err[2]
+    #    body += ' This is likely due to size limits.'
+    #else:
+    #    body += ' This is likely due to attachment restrictions.'
 
-    body += ' Book: ' + book_name
+    #body += ' Book: ' + book_name
 
-    fromaddr = config.smtp_user
-    toaddr = config.email_to
+    #fromaddr = config.smtp_user
+    #toaddr = config.email_to
 
-    msg = MIMEMultipart()
+    #msg = MIMEMultipart()
 
-    msg['From'] = fromaddr
-    msg['To'] = toaddr
-    msg['Subject'] = "GrabPackt book claimed!"
+    #msg['From'] = fromaddr
+    #msg['To'] = toaddr
+    #msg['Subject'] = "GrabPackt book claimed!"
 
     # attach the body
-    msg.attach(MIMEText(body, 'plain'))
+    #msg.attach(MIMEText(body, 'plain'))
+
+    # override the message creation...
+    message = create_message(config, book_name, links, attachments=[], is_new_book=is_new_book, is_error=True)
+
 
     # send the message
     # send_error_message(config, msg)
-    send_message(config, msg, book_name)
+    send_message(config, message, book_name, links, is_new_book)
 
 
 def cleanup(config, files, zip_filename=""):
@@ -459,7 +463,7 @@ def cleanup(config, files, zip_filename=""):
                 os.remove(filename)
 
 
-def html_mail(book_title, links, is_new_book):
+def html_mail(book_title, links, is_new_book, is_error=False):
     """Creates a neat looking HTML formatted message.
     
     Keyword arguments:
@@ -489,6 +493,12 @@ def html_mail(book_title, links, is_new_book):
     else:
         # the book was not newly claimed; create appropriate message.
         html = html.replace(u'{{REPLACE_LINKS}}', u'You already own this book.')
+
+
+    if is_error:
+        html = html.replace(u'{{ERROR_MESSAGE}}', u'An error occurred during sending the attachments.')
+    else:
+        html = html.replace(u'{{ERROR_MESSAGE}}', u'')
 
     return html
 
@@ -569,7 +579,7 @@ def main():
                                 message = create_message(config, book_title, links, attachments, is_new_book=True)
 
                                 # send the email...
-                                send_message(config, message, book_title)
+                                send_message(config, message, book_title, links, is_new_book=True)
 
                                 # perform cleanup
                                 cleanup(config, files, zip_filename)
@@ -585,7 +595,7 @@ def main():
                         message = create_message(config, book_title, links, attachments, is_new_book=False)
 
                         # send the message; no cleanup necessary!
-                        send_message(config, message, book_title)
+                        send_message(config, message, book_title, links, is_new_book=False)
                                                    
 
 if __name__ == "__main__":
