@@ -335,7 +335,7 @@ def create_message(config, book_name, links, attachments, is_new_book, is_error=
     msg['Subject'] = "GrabPackt: " + book_name
 
     # get the body by creating an html mail
-    body = html_mail(book_name, links, is_new_book)
+    body = html_mail(book_name, links, is_new_book, is_error)
 
     # attach the body
     msg.attach(MIMEText(body, 'html'))
@@ -463,7 +463,7 @@ def cleanup(config, files, zip_filename=""):
                 os.remove(filename)
 
 
-def html_mail(book_title, links, is_new_book):
+def html_mail(book_title, links, is_new_book, is_error=False):
     """Creates a neat looking HTML formatted message.
     
     Keyword arguments:
@@ -493,6 +493,12 @@ def html_mail(book_title, links, is_new_book):
     else:
         # the book was not newly claimed; create appropriate message.
         html = html.replace(u'{{REPLACE_LINKS}}', u'You already own this book.')
+
+
+    if is_error:
+        html = html.replace(u'{{ERROR_MESSAGE}}', u'An error occurred during sending the attachments.')
+    else:
+        html = html.replace(u'{{ERROR_MESSAGE}}', u'')
 
     return html
 
@@ -526,7 +532,7 @@ def main():
                 owned_book_ids = get_owned_book_ids(session)
 
                 # when not previously owned, grab the book
-                if int(new_book_id)+1 not in owned_book_ids.keys():
+                if int(new_book_id) not in owned_book_ids.keys():
 
                     # perform the claim
                     has_claimed, claim_text = claim(session, claim_path)
