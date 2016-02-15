@@ -436,7 +436,7 @@ def handle_error_message(config, err, book_name, links, is_new_book):
     #msg.attach(MIMEText(body, 'plain'))
 
     # override the message creation...
-    message = create_message(config, book_name, links, [], is_new_book, is_error=True)
+    message = create_message(config, book_name, links, attachments=[], is_new_book=is_new_book, is_error=True)
 
 
     # send the message
