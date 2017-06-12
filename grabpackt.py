@@ -43,6 +43,7 @@ FORM_ID = "packt_user_login_form"
 FORM_BUILD_ID_XPATH = "//*[@id='packt-user-login-form']//*[@name='form_build_id']"
 CLAIM_BOOK_XPATH = "//*[@class='float-left free-ebook']"
 BOOK_LIST_XPATH = "//*[@id='product-account-list']"
+BOOK_TITLE_XPATH = "//*[@class='dotd-title']/h2"
 
 # specify UTF-8 parser; otherwise errors during parser
 UTF8_PARSER = etree.HTMLParser(encoding="utf-8")
@@ -59,7 +60,6 @@ HEADERS = {
 # the location for the temporary download location
 BASE_DIRECTORY = os.path.dirname(os.path.realpath(__file__)) + os.sep
 DOWNLOAD_DIRECTORY = BASE_DIRECTORY + 'tmp' + os.sep
-
 
 # a minimal helper class for storing configuration keys and value
 class Config(dict):
@@ -317,7 +317,7 @@ def prepare_attachments(config, files, zip_filename=""):
 
 
 
-def create_message(config, book_name, links, attachments, is_new_book, is_error=False):
+def create_message(config, book_name, links, attachments, is_new_book, is_error=False, is_recaptcha_fallback=False):
     """Construct a MIME message.
 
     config -- the configuration object
@@ -335,7 +335,7 @@ def create_message(config, book_name, links, attachments, is_new_book, is_error=
     msg['Subject'] = "GrabPackt: " + book_name
 
     # get the body by creating an html mail
-    body = html_mail(book_name, links, is_new_book, is_error)
+    body = html_mail(book_name, links, is_new_book, is_error, is_recaptcha_fallback)
 
     # attach the body
     msg.attach(MIMEText(body, 'html'))
@@ -463,7 +463,7 @@ def cleanup(config, files, zip_filename=""):
                 os.remove(filename)
 
 
-def html_mail(book_title, links, is_new_book, is_error=False):
+def html_mail(book_title, links, is_new_book, is_error=False, is_recaptcha_fallback=False):
     """Creates a neat looking HTML formatted message.
     
     Keyword arguments:
@@ -488,7 +488,9 @@ def html_mail(book_title, links, is_new_book, is_error=False):
             link_parts = u"   |   ".join(a_parts)
             html = html.replace(u'{{REPLACE_LINKS}}', link_parts)
 
-        else: 
+        elif is_recaptcha_fallback:
+            html = html.replace(u'{{REPLACE_LINKS}}', u'Could not retrieve the <a href="{0}" target="_blank">new book</a> because of reCaptcha.'.format(GRAB_URL))
+        else:
             html = html.replace(u'{{REPLACE_LINKS}}', u'No links found.')
     else:
         # the book was not newly claimed; create appropriate message.
@@ -533,56 +535,67 @@ def main():
 
                 # when not previously owned, grab the book
                 if int(new_book_id) not in owned_book_ids.keys():
+                
 
                     # perform the claim
                     has_claimed, claim_text = claim(session, claim_path)
+                    
+                    if (claim_text.encode('utf-8').lower().find('recaptcha') > 0):
+                        # since about somewhere in May or the start of June 2017, Packt Publishing has Google reCaptcha enabled
+                        # currently the script does not support a way to get around the captcha, but will send a link with the new book instead
+                        book_title = etree.HTML(claim_text, UTF8_PARSER).xpath(BOOK_TITLE_XPATH)[0].text.strip()
+                        links = attachments = {}
+                        message = create_message(config, book_title, links, attachments, is_new_book=True, is_error=False, is_recaptcha_fallback=True)
+                        send_message(config, message, book_title, links, is_new_book=True)
+                        
+                    else:
 
-                    if has_claimed:
+                        if has_claimed:
 
-                        if config.email_enabled:
+                            if config.email_enabled:
 
-                            # following is a redundant check; first verion of uniqueness;
-                            # the book_id should be the nid of the first child of the list of books on the my-ebooks page
-                            book_list_element = etree.HTML(claim_text, UTF8_PARSER).xpath(BOOK_LIST_XPATH)[0]
-                            first_book_element = book_list_element.getchildren()[0]
+                                # following is a redundant check; first verion of uniqueness;
+                                # the book_id should be the nid of the first child of the list of books on the my-ebooks page                               
+                                book_list_element = etree.HTML(claim_text, UTF8_PARSER).xpath(BOOK_LIST_XPATH)[0]
+                                first_book_element = book_list_element.getchildren()[0]
 
-                            if first_book_element.get('nid') == str(new_book_id): # equivalent: str(book_id) in first_book_element.values()
-                                # the newly claimed book id is indeed a new book (not claimed before)
-                                book_element = first_book_element
-                                book_id = new_book_id
+                                if first_book_element.get('nid') == str(new_book_id): # equivalent: str(book_id) in first_book_element.values()
+                                    # the newly claimed book id is indeed a new book (not claimed before)
+                                    book_element = first_book_element
+                                    book_id = new_book_id
 
-                                # extract the name of the book
-                                book_title = book_element.get('title')
+                                    # extract the name of the book
+                                    book_title = book_element.get('title')
 
-                                # get the links that should be downloaded and/or listed in mail
-                                links = prepare_links(config, book_element)
+                                    # get the links that should be downloaded and/or listed in mail
+                                    links = prepare_links(config, book_element)
 
-                                # if we only want the links, we're basically ready for sending an email
-                                # else we need some more juggling downloading the goodies
-                                files = {}
-                                zip_filename = ""
-                                if not config.email_links_only:
-                                    # first download the files to a temporary location relative to grabpackt
-                                    files = download(session, book_id, links)
+                                    # if we only want the links, we're basically ready for sending an email
+                                    # else we need some more juggling downloading the goodies
+                                    files = {}
+                                    zip_filename = ""
+                                    if not config.email_links_only:
+                                        # first download the files to a temporary location relative to grabpackt
+                                        files = download(session, book_id, links)
 
-                                    # next check if we need to zip the downloaded files
-                                    if config.email_zip:
-                                        # only pack files when there is more than 1, or has been enforced
-                                        if len(files) > 1 or config.email_force_zip:
-                                            zip_filename = create_zip(files, book_title)
+                                        # next check if we need to zip the downloaded files
+                                        if config.email_zip:
+                                            # only pack files when there is more than 1, or has been enforced
+                                            if len(files) > 1 or config.email_force_zip:
+                                                zip_filename = create_zip(files, book_title)
 
 
-                                # prepare attachments for sending
-                                attachments = prepare_attachments(config, files, zip_filename)
+                                    # prepare attachments for sending
+                                    attachments = prepare_attachments(config, files, zip_filename)
 
-                                # construct the email with all necessary items...
-                                message = create_message(config, book_title, links, attachments, is_new_book=True)
+                                    # construct the email with all necessary items...
+                                    message = create_message(config, book_title, links, attachments, is_new_book=True)
 
-                                # send the email...
-                                send_message(config, message, book_title, links, is_new_book=True)
+                                    # send the email...
+                                    send_message(config, message, book_title, links, is_new_book=True)
 
-                                # perform cleanup
-                                cleanup(config, files, zip_filename)
+                                    # perform cleanup
+                                    cleanup(config, files, zip_filename)
 
                 else:
                     # we already owned the book; send a mail that we already owned the book
