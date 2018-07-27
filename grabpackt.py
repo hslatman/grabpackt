@@ -212,9 +212,7 @@ def is_new_book(session, contents):
     new_a_element = new_claim_book_element[0].getchildren()[0]
 
     relative_url = new_a_element.values()[0]
-    #potentially_new_book_url = LOGIN_URL + relative_url[1:]
-    potentially_new_book_url = 'https://www.packtpub.com/application-development/domain-driven-design-php'
-
+    potentially_new_book_url = LOGIN_URL + relative_url[1:]
 
     req = session.get(potentially_new_book_url)
     owned = False
