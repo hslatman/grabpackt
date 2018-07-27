@@ -56,8 +56,7 @@ UTF8_PARSER = etree.HTMLParser(encoding="utf-8")
 # Refererer: just set to not show up as some weirdo in their logs, I guess
 HEADERS = {
     'User-Agent':
-        'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Chrome/41.0.2228.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3314.0 Safari/537.36',
 }
 
 # the location for the temporary download location
