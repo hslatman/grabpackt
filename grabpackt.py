@@ -42,6 +42,9 @@ BOOKS_URL = "https://www.packtpub.com/account/my-ebooks"
 FORM_ID = "packt_user_login_form"
 FORM_BUILD_ID_XPATH = "//*[@id='packt-user-login-form']//*[@name='form_build_id']"
 CLAIM_BOOK_XPATH = "//*[@class='float-left free-ebook']"
+CLAIM_BOOK_XPATH_NEW = "//*[@class='dotd-main-book-image float-left']"
+CLAIM_BOOK_DOWNLOAD_XPATH = "//*[@class='download-container download-button book-button book-mobile-download-button']"
+CLAIM_BOOK_TITLE_XPATH = "//*[@class='book-top-block-info-title float-left']"
 BOOK_LIST_XPATH = "//*[@id='product-account-list']"
 BOOK_TITLE_XPATH = "//*[@class='dotd-title']/h2"
 
@@ -183,6 +186,55 @@ def get_book_id(contents):
     book_id = claim_path.split('/')[1]
 
     return book_id, claim_path
+
+
+def is_new_book(session, contents):
+    """Checks whether a book is already owned or not based on (URL of) title
+
+    Keyword arguments:
+    contents -- a string containing the contents of an HTML page
+    session -- a requests.Session object
+    """
+    # parsing the new tree
+    free_learning_tree = etree.HTML(contents, UTF8_PARSER)
+
+    # extract data: a href with ids
+    claim_book_element = free_learning_tree.xpath(CLAIM_BOOK_XPATH)
+    a_element = claim_book_element[0].getchildren()[0]
+    # format: /freelearning-claim/{id1}/{id2}; id1 and id2 are numerical, length 5
+    a_href = a_element.values()[0]
+
+    # get the exact book_id
+    claim_path = a_href[1:]
+    book_id = claim_path.split('/')[1]
+
+    # extract data: a href with ids
+    new_claim_book_element = free_learning_tree.xpath(CLAIM_BOOK_XPATH_NEW)
+    new_a_element = new_claim_book_element[0].getchildren()[0]
+
+    relative_url = new_a_element.values()[0]
+    #potentially_new_book_url = LOGIN_URL + relative_url[1:]
+    potentially_new_book_url = 'https://www.packtpub.com/application-development/domain-driven-design-php'
+
+
+    req = session.get(potentially_new_book_url)
+    owned = False
+    if req.status_code == 200:
+        new_book_contents = req.text
+        new_book_tree = etree.HTML(new_book_contents, UTF8_PARSER)
+        book_download_element = new_book_tree.xpath(CLAIM_BOOK_DOWNLOAD_XPATH)
+        book_title_element = new_book_tree.xpath(CLAIM_BOOK_TITLE_XPATH)
+
+        if book_download_element:
+            owned = True
+
+        new_title_element = book_title_element[0].getchildren()
+        book_title = new_title_element[0].text
+
+        return not owned, claim_path, book_id, book_title
+    
+    else:
+        return True, "", 0, ""
 
 
 def claim(session, claim_path):
@@ -527,15 +579,17 @@ def main():
             # if the page is availbale (status code equaled 200), perform the rest of the process
             if page_available:
 
+                has_new_book, claim_path, new_book_id, new_book_title = is_new_book(session, page_contents)
+
                 # extract the new book id from the page contents
-                new_book_id, claim_path = get_book_id(page_contents)
+                #new_book_id, claim_path = get_book_id(page_contents)
 
                 # get a list of the IDs of all the books already owned
-                owned_book_ids = get_owned_book_ids(session)
+                #owned_book_ids = get_owned_book_ids(session)
 
                 # when not previously owned, grab the book
-                if int(new_book_id) not in owned_book_ids.keys():
-                
+                #if int(new_book_id) not in owned_book_ids.keys():
+                if has_new_book:
 
                     # perform the claim
                     has_claimed, claim_text = claim(session, claim_path)
@@ -601,7 +655,8 @@ def main():
                     # we already owned the book; send a mail that we already owned the book
                     if config.email_enabled:
                         # pick the book_id entry from owned_book_ids
-                        book_title = owned_book_ids[int(new_book_id)].replace(' [eBook]', '')
+                        #book_title = owned_book_ids[int(new_book_id)].replace(' [eBook]', '')
+                        book_title = new_book_title
 
                         # create a message with empty links and attachments
                         links = attachments = {}

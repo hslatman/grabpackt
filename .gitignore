@@ -1,3 +1,4 @@
 *.ini
 *tmp
 *env
+.vscode
